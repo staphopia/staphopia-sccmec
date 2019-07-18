@@ -11,7 +11,7 @@ from executor import ExternalCommand
 
 
 PROGRAM = os.path.basename(sys.argv[0])
-VERSION = "0.0.1"
+VERSION = "0.0.2"
 DESCRIPTION = "A standalone version of Staphopia's SCCmec typing method."
 STDOUT = 11
 STDERR = 12
@@ -448,6 +448,8 @@ if __name__ == '__main__':
     group1.add_argument('--prefix', metavar="STR", type=str,
                         help=('Prefix (e.g. sample name) to use for outputs '
                               '(Default: assembly file without extension)'))
+    group1.add_argument('--hamming', action='store_true',
+                        help='Report the hamming distance of each type.')
     group1.add_argument('--cpus', metavar='INT', type=int, default=1,
                         help='Number of processors to use.')
     group1.add_argument('--keep_files', action='store_true',
@@ -496,10 +498,12 @@ if __name__ == '__main__':
     logging.info(f'BLAST SCCmec primers against {args.assembly}')
     primer_hits = blastn(f'{args.sccmec_data}/primers.fasta', blastdb,
                          f'{outdir}/primers.json')
-    primer_prediction = predict_type_by_primers(prefix, primer_hits)
+    primer_prediction = predict_type_by_primers(prefix, primer_hits,
+                                                hamming_distance=args.hamming)
     subtype_hits = blastn(f'{args.sccmec_data}/subtypes.fasta', blastdb,
                           f'{outdir}/subtypes.json')
-    subtype_prediction = predict_subtype_by_primers(prefix, subtype_hits)
+    subtype_prediction = predict_subtype_by_primers(prefix, subtype_hits,
+                                                    hamming_distance=args.hamming)
 
     primer_out = f'{outdir}/sccmec-primer-type.json'
     logging.info(f'Writing predicted SCCmec type based on primers to {primer_out}')
