@@ -7,7 +7,6 @@ import logging
 import os
 import sys
 from collections import OrderedDict
-from executor import ExternalCommand
 
 
 PROGRAM = os.path.basename(sys.argv[0])
@@ -76,6 +75,7 @@ def get_log_level():
 def execute(cmd, directory=os.getcwd(), capture=False, capture_stderr=False,
             stdout_file=None, stderr_file=None, silent=True):
     """A simple wrapper around executor."""
+    from executor import ExternalCommand
     command = ExternalCommand(
         cmd, directory=directory, capture=capture,
         capture_stderr=capture_stderr, stdout_file=stdout_file,
@@ -435,19 +435,29 @@ if __name__ == '__main__':
               {PROGRAM} test/GCF_001580515.1.fna data/ ./
         ''')
     )
-    parser = ap.ArgumentParser(prog='mlst-blast.py',
+    parser = ap.ArgumentParser(prog='staphopia-sccmec.py',
                                conflict_handler='resolve',
-                               description='Determine MLST via BLAST')
+                               description='Determine SCCmec Type/SubType')
     group1 = parser.add_argument_group('Options', '')
-    group1.add_argument('assembly', metavar="ASSEMBLY", type=str,
-                        help='Input assembly (FASTA format) to predict SCCmec')
-    group1.add_argument('sccmec_data', metavar="SCCMEC_DATA", type=str,
-                        help='Directory where SCCmec reference data is stored')
+    group1.add_argument('assembly', metavar="ASSEMBLY|PRIMERS_JSON", type=str,
+                        help=('Input assembly (FASTA format) to predict SCCmec. Or, '
+                              '"primers.json" from Staphopia, this requires '
+                              '"--staphopia"'))
+    group1.add_argument('sccmec_data', metavar="SCCMEC_DATA|SUBTYPES_JSON", type=str,
+                        help=('Directory where SCCmec reference data is stored. Or, '
+                              '"subtypes.json" from Staphopia, this requires '
+                              '"--staphopia"'))
     group1.add_argument('outdir', metavar="OUTPUT_DIR", type=str,
                         help='Directory to output results to')
     group1.add_argument('--prefix', metavar="STR", type=str,
                         help=('Prefix (e.g. sample name) to use for outputs '
                               '(Default: assembly file without extension)'))
+    group1.add_argument('--staphopia', action='store_true', 
+                        help=('Inputs are results from Staphopia. The first '
+                              'arguement (ASSEMBLY) should be "primers.json" '
+                              'and the second arguement (SCCMEC_DATA) should '
+                              'be "subtypes.json". These files are found in '
+                              '"analyses/sccmec" folder of Staphopia results.'))
     group1.add_argument('--hamming', action='store_true',
                         help='Report the hamming distance of each type.')
     group1.add_argument('--cpus', metavar='INT', type=int, default=1,
@@ -481,7 +491,8 @@ if __name__ == '__main__':
         sys.exit(0)
     else:
         validate_requirements()
-        validate_datasets(args.sccmec_data, args.assembly)
+        if not args.staphopia:
+            validate_datasets(args.sccmec_data, args.assembly)
 
     # Get prefix for file names
     prefix = os.path.splitext(os.path.basename(args.assembly))[0]
@@ -490,18 +501,27 @@ if __name__ == '__main__':
     outdir = f'{args.outdir}/{prefix}'
     execute(f'mkdir -p {outdir}')
 
-    # Make temporary BLAST database
-    logging.info(f'Make BLAST database for {args.assembly}')
-    blastdb = makeblastdb(args.assembly, outdir, prefix)
+    primer_hits = None
+    subtype_hits = None
+    if not args.staphopia:
+        # Make temporary BLAST database
+        logging.info(f'Make BLAST database for {args.assembly}')
+        blastdb = makeblastdb(args.assembly, outdir, prefix)
 
-    # BLAST SCCmec Primers (including subtypes)
-    logging.info(f'BLAST SCCmec primers against {args.assembly}')
-    primer_hits = blastn(f'{args.sccmec_data}/primers.fasta', blastdb,
-                         f'{outdir}/primers.json')
+        # BLAST SCCmec Primers (including subtypes)
+        logging.info(f'BLAST SCCmec primers against {args.assembly}')
+        primer_hits = blastn(f'{args.sccmec_data}/primers.fasta', blastdb,
+                             f'{outdir}/primers.json')
+        subtype_hits = blastn(f'{args.sccmec_data}/subtypes.fasta', blastdb,
+                              f'{outdir}/subtypes.json')
+    else:
+        # Read Staphopia outputs
+        logging.info(f'Make BLAST database for {args.assembly}')
+        primer_hits = read_blast_json(args.assembly)
+        subtype_hits = read_blast_json(args.sccmec_data)
+
     primer_prediction = predict_type_by_primers(prefix, primer_hits,
                                                 hamming_distance=args.hamming)
-    subtype_hits = blastn(f'{args.sccmec_data}/subtypes.fasta', blastdb,
-                          f'{outdir}/subtypes.json')
     subtype_prediction = predict_subtype_by_primers(prefix, subtype_hits,
                                                     hamming_distance=args.hamming)
 
