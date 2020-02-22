@@ -95,8 +95,12 @@ def makeblastdb(input, outdir, prefix):
     """ Make a BLAST database for a given input FASTA. """
     blastdb = f'{outdir}/blastdb'
     execute(f'mkdir -p {blastdb}')
-    execute((f'makeblastdb -in {input} -input_type fasta -dbtype "nucl" '
-             f'-title "{prefix}" -out {blastdb}/{prefix}'))
+    if input.endswith("gz"):
+        execute((f'zcat {input} | makeblastdb -in - -input_type fasta -dbtype "nucl" '
+                 f'-title "{prefix}" -out {blastdb}/{prefix}'))
+    else:
+        execute((f'makeblastdb -in {input} -input_type fasta -dbtype "nucl" '
+                 f'-title "{prefix}" -out {blastdb}/{prefix}'))
     return f'{blastdb}/{prefix}'
 
 
@@ -516,7 +520,7 @@ if __name__ == '__main__':
                               f'{outdir}/subtypes.json')
     else:
         # Read Staphopia outputs
-        logging.info(f'Make BLAST database for {args.assembly}')
+        logging.info(f'Processing Staphopia outputs')
         primer_hits = read_blast_json(args.assembly)
         subtype_hits = read_blast_json(args.sccmec_data)
 
