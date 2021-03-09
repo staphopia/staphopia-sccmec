@@ -10,7 +10,7 @@ from collections import OrderedDict
 
 
 PROGRAM = os.path.basename(sys.argv[0])
-VERSION = "0.0.2"
+VERSION = "0.0.3"
 DESCRIPTION = "A standalone version of Staphopia's SCCmec typing method."
 STDOUT = 11
 STDERR = 12
@@ -21,11 +21,7 @@ logging.addLevelName(STDERR, "STDERR")
 def validate_requirements():
     """Validate the required programs are available, if not exit (1)."""
     from shutil import which
-    programs = {
-        'makeblastdb': which('makeblastdb'), 'blastn': which('blastn'),
-        'tblastn': which('tblastn')
-    }
-
+    programs = {'makeblastdb': which('makeblastdb'), 'blastn': which('blastn')}
     missing = False
     for prog, path in programs.items():
         if path:
@@ -41,14 +37,7 @@ def validate_requirements():
 
 def validate_datasets(data_dir, input_assembly):
     """Validate required reference datasets are available, if not exit (1)."""
-    datasets = {
-        'primers': f'{data_dir}/primers.fasta',
-        'proteins': f'{data_dir}/proteins.fasta',
-        'subtypes': f'{data_dir}/subtypes.fasta',
-        'mapping': f'{data_dir}/sccmec_cassettes.bwt',
-        'input_assembly': input_assembly
-    }
-
+    datasets = {'primers': f'{data_dir}/primers.fasta', 'subtypes': f'{data_dir}/subtypes.fasta', 'inputs': input_assembly}
     missing = False
     for dataset, path in datasets.items():
         if os.path.exists(path):
@@ -62,9 +51,9 @@ def validate_datasets(data_dir, input_assembly):
         sys.exit(1)
 
 
-def set_log_level(error, debug):
+def set_log_level(debug):
     """Set the output log level."""
-    return logging.ERROR if error else logging.DEBUG if debug else logging.INFO
+    return logging.DEBUG if debug else logging.ERROR
 
 
 def get_log_level():
@@ -113,26 +102,6 @@ def blastn(query, blastdb, output):
     return read_blast_json(output)
 
 
-def tblastn(query, blastdb, output, cpu=1):
-    """ BLAST SCCmec related proteins against an input assembly. """
-    execute((
-        f'tblastn -db {blastdb} -outfmt 15 -query {query} -evalue 0.0001 '
-        f'-outfmt 15 -num_threads {cpu} -max_target_seqs 1 > {output}'
-    ))
-    return read_blast_json(output)
-
-
-def mapping(fastq, ):
-    """ Map FASTQ reads against reference SCCmec cassettes. """
-    """
-    bwa-align.sh "!{fq}" !{staphopia_data}/sccmec/sccmec_cassettes !{read_length} !{cpu} "!{p}" "!{n}"
-    samtools view -bS bwa.sam | samtools sort -o sccmec.bam -
-    genomeCoverageBed -ibam sccmec.bam -d | gzip --best - > cassette-coverages.gz
-    cp .command.err sccmec-mapping-stderr.log
-    cp .command.out sccmec-mapping-stdout.log
-    """
-
-
 def read_blast_json(json_file):
     """ Process input BLAST JSON and return hits as a list. """
     hits = []
@@ -156,6 +125,7 @@ def read_blast_json(json_file):
                 hd = hit['query_len'] - hsp['align_len'] + mismatch
 
             hits.append({
+                'sample': entry['report']['search_target']['db'].replace('-contigs', ''),
                 'title': hit['query_title'],
                 'length': hit['query_len'],
                 'bitscore': int(hsp['bit_score']),
@@ -410,21 +380,19 @@ def predict_subtype_by_primers(prefix, blast_results, hamming_distance=False):
     return subtypes
 
 
-def print_predictions(cassettes, subtypes, output, quiet=False):
-    """ Output the predictions in JSON format. """
-    prediction = {
-        'cassette': cassettes,
-        'subtype': subtypes
-    }
-    with open(output, 'w') as json_fh:
-        json.dump(prediction, json_fh, indent=4)
-
-    if not quiet:
-        print(json.dumps(prediction, indent=4))
+def merge_predictions(types, subtypes):
+    """Merge the the type and subtype predictions."""
+    for key, val in subtypes.items():
+        if key != "sample":
+            types[key] = val
+    return types
 
 
 if __name__ == '__main__':
     import argparse as ap
+    import csv
+    import glob
+    import tempfile
     import textwrap
     parser = ap.ArgumentParser(
         prog=PROGRAM,
@@ -443,35 +411,21 @@ if __name__ == '__main__':
                                conflict_handler='resolve',
                                description='Determine SCCmec Type/SubType')
     group1 = parser.add_argument_group('Options', '')
-    group1.add_argument('assembly', metavar="ASSEMBLY|PRIMERS_JSON", type=str,
-                        help=('Input assembly (FASTA format) to predict SCCmec. Or, '
-                              '"primers.json" from Staphopia, this requires '
-                              '"--staphopia"'))
-    group1.add_argument('sccmec_data', metavar="SCCMEC_DATA|SUBTYPES_JSON", type=str,
-                        help=('Directory where SCCmec reference data is stored. Or, '
-                              '"subtypes.json" from Staphopia, this requires '
-                              '"--staphopia"'))
-    group1.add_argument('outdir', metavar="OUTPUT_DIR", type=str,
-                        help='Directory to output results to')
-    group1.add_argument('--prefix', metavar="STR", type=str,
-                        help=('Prefix (e.g. sample name) to use for outputs '
-                              '(Default: assembly file without extension)'))
+    group1.add_argument('assembly', metavar="ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR", type=str,
+                        help=('Input assembly (FASTA format), directory of assemblies to predict SCCmec. Or, a '
+                              'directory of samples processed by Staphopia (requires "--staphopia"'))
+    group1.add_argument('--sccmec', metavar="SCCMEC_DATA", type=str, default="./",
+                        help='Directory where SCCmec reference data is stored.')
+    group1.add_argument('--ext', metavar="STR", type=str, default="fna",
+                        help=('Extension used by assemblies. (Default: fna)'))
     group1.add_argument('--staphopia', action='store_true', 
-                        help=('Inputs are results from Staphopia. The first '
-                              'arguement (ASSEMBLY) should be "primers.json" '
-                              'and the second arguement (SCCMEC_DATA) should '
-                              'be "subtypes.json". These files are found in '
-                              '"analyses/sccmec" folder of Staphopia results.'))
+                        help=('Input is a directory of samples processed by Staphopia.'))
     group1.add_argument('--hamming', action='store_true',
                         help='Report the hamming distance of each type.')
-    group1.add_argument('--cpus', metavar='INT', type=int, default=1,
-                        help='Number of processors to use.')
-    group1.add_argument('--keep_files', action='store_true',
-                        help='Keep all output files (Default: remove blastdb.')
+    group1.add_argument('--tab', action='store_true',
+                        help='Report the output as tab-delimited.')
     group1.add_argument('--debug', action='store_true',
                         help='Print debug related text.')
-    group1.add_argument('--quiet', action='store_true',
-                        help='Only critical errors will be printed.')
     group1.add_argument('--depends', action='store_true',
                         help='Verify dependencies are installed/found.')
     group1.add_argument('--version', action='version',
@@ -483,57 +437,67 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    # Setup logs
-    FORMAT = '%(asctime)s:%(name)s:%(levelname)s - %(message)s'
-    logging.basicConfig(format=FORMAT, datefmt='%Y-%m-%d %H:%M:%S',)
-    logging.getLogger().setLevel(set_log_level(args.quiet, args.debug))
+    # Setup logging
+    logging.basicConfig(format='%(asctime)s:%(name)s:%(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
+                        stream=sys.stderr, level=set_log_level(args.debug))
 
     # Check dependencies
+    primer_fasta = f'{args.sccmec}/primers.fasta'
+    subtype_fasta = f'{args.sccmec}/subtypes.fasta'
     if args.depends:
         validate_requirements()
-        validate_datasets(args.sccmec_data, args.assembly)
+        validate_datasets(args.sccmec, args.assembly)
         sys.exit(0)
     else:
-        validate_requirements()
         if not args.staphopia:
-            validate_datasets(args.sccmec_data, args.assembly)
-
-    # Get prefix for file names
-    prefix = os.path.splitext(os.path.basename(args.assembly))[0]
-    if args.prefix:
-        prefix = args.prefix
-    outdir = f'{args.outdir}/{prefix}'
-    execute(f'mkdir -p {outdir}')
+            validate_requirements()
+            validate_datasets(args.sccmec, args.assembly)
 
     primer_hits = None
     subtype_hits = None
+    results = []
     if not args.staphopia:
-        # Make temporary BLAST database
-        logging.info(f'Make BLAST database for {args.assembly}')
-        blastdb = makeblastdb(args.assembly, outdir, prefix)
+        assemblies = glob.glob(f'{args.assembly}/*.{args.etx}') if os.path.isdir(args.assembly) else [args.assembly]
+        blastdir = f'{outdir}/.sccmec_blast'
+        with tempfile.TemporaryDirectory() as tempdir:
+            for assembly in assemblies:
+                # Make temporary BLAST database
+                prefix = os.path.basename(assembly).replace(f'{args.ext}', '')
+                outdir = f'{tempdir}/{prefix}'
+                execute(f'mkdir -p {outdir}')
 
-        # BLAST SCCmec Primers (including subtypes)
-        logging.info(f'BLAST SCCmec primers against {args.assembly}')
-        primer_hits = blastn(f'{args.sccmec_data}/primers.fasta', blastdb,
-                             f'{outdir}/primers.json')
-        subtype_hits = blastn(f'{args.sccmec_data}/subtypes.fasta', blastdb,
-                              f'{outdir}/subtypes.json')
+                logging.info(f'Make BLAST database for {assembly}')
+                blastdb = makeblastdb(assembly, outdir, prefix)
+
+                # BLAST SCCmec Primers (including subtypes)
+                logging.info(f'BLAST SCCmec primers against {assembly}')
+                primer_hits = blastn(primer_fasta, blastdb, f'{outdir}/primers.json')
+                subtype_hits = blastn(subtype_fasta, blastdb, f'{outdir}/subtypes.json')
+
+                # Merge results and add to list
+                primer_prediction = predict_type_by_primers(prefix, primer_hits, hamming_distance=args.hamming)
+                subtype_prediction = predict_subtype_by_primers(prefix, subtype_hits, hamming_distance=args.hamming)
+                results.append(merge_predictions(primer_prediction, subtype_prediction))
     else:
-        # Read Staphopia outputs
+        # Read Staphopia (v1) outputs
         logging.info(f'Processing Staphopia outputs')
-        primer_hits = read_blast_json(args.assembly)
-        subtype_hits = read_blast_json(args.sccmec_data)
+        for sample_path in sorted(glob.glob(f'{args.assembly}/*/')):
+            sample = os.path.basename(sample_path.rstrip("/"))
+            primer_json = f'{sample_path}/analyses/sccmec/primers.json'
+            subtype_json = f'{sample_path}/analyses/sccmec/subtypes.json'
 
-    primer_prediction = predict_type_by_primers(prefix, primer_hits,
-                                                hamming_distance=args.hamming)
-    subtype_prediction = predict_subtype_by_primers(prefix, subtype_hits,
-                                                    hamming_distance=args.hamming)
+            if os.path.exists(primer_json) and os.path.exists(subtype_json):
+                primer_hits = read_blast_json(primer_json)
+                subtype_hits = read_blast_json(subtype_json)
+                primer_prediction = predict_type_by_primers(sample, primer_hits, hamming_distance=args.hamming)
+                subtype_prediction = predict_subtype_by_primers(sample, subtype_hits, hamming_distance=args.hamming)
+                results.append(merge_predictions(primer_prediction, subtype_prediction))
+            else:
+                logging.debug(f'Sample {sample} is missing {primer_json} or {subtype_json}, skipping')
 
-    primer_out = f'{outdir}/sccmec-primer-type.json'
-    logging.info(f'Writing predicted SCCmec type based on primers to {primer_out}')
-    print_predictions(primer_prediction, subtype_prediction, primer_out,
-                      quiet=args.quiet)
-
-    # Clean up
-    if not args.keep_files:
-        execute(f'rm -rf {outdir}/blastdb')
+    if args.tab:
+        writer = csv.DictWriter(sys.stdout, fieldnames=results[0].keys(), delimiter="\t")
+        writer.writeheader()
+        writer.writerows(results)
+    else:
+        print(json.dumps(results, indent=4))
