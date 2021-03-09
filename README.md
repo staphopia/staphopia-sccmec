@@ -25,11 +25,10 @@ cd staphopia-sccmec.git
 
 ### Usage
 ```
-usage: staphopia-sccmec.py [-h] [--prefix STR] [--staphopia] [--hamming]
-                           [--cpus INT] [--keep_files] [--debug] [--quiet]
+usage: staphopia-sccmec.py [-h] [--sccmec SCCMEC_DATA] [--ext STR]
+                           [--staphopia] [--hamming] [--tab] [--debug]
                            [--depends] [--version]
-                           ASSEMBLY|PRIMERS_JSON SCCMEC_DATA|SUBTYPES_JSON
-                           OUTPUT_DIR
+                           ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR
 
 Determine SCCmec Type/SubType
 
@@ -38,30 +37,19 @@ optional arguments:
 
 Options:
 
-  ASSEMBLY|PRIMERS_JSON
-                        Input assembly (FASTA format) to predict SCCmec. Or,
-                        "primers.json" from Staphopia, this requires "--
-                        staphopia"
-  SCCMEC_DATA|SUBTYPES_JSON
-                        Directory where SCCmec reference data is stored. Or,
-                        "subtypes.json" from Staphopia, this requires "--
-                        staphopia"
-  OUTPUT_DIR            Directory to output results to
-  --prefix STR          Prefix (e.g. sample name) to use for outputs (Default:
-                        assembly file without extension)
-  --staphopia           Inputs are results from Staphopia. The first arguement
-                        (ASSEMBLY) should be "primers.json" and the second
-                        arguement (SCCMEC_DATA) should be "subtypes.json".
-                        These files are found in "analyses/sccmec" folder of
-                        Staphopia results.
+  ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR
+                        Input assembly (FASTA format), directory of assemblies
+                        to predict SCCmec. Or, a directory of samples
+                        processed by Staphopia (requires "--staphopia"
+  --sccmec SCCMEC_DATA  Directory where SCCmec reference data is stored.
+  --ext STR             Extension used by assemblies. (Default: fna)
+  --staphopia           Input is a directory of samples processed by
+                        Staphopia.
   --hamming             Report the hamming distance of each type.
-  --cpus INT            Number of processors to use.
-  --keep_files          Keep all output files (Default: remove blastdb.
+  --json                Report the output as JSON (Default: tab-delimited)
   --debug               Print debug related text.
-  --quiet               Only critical errors will be printed.
   --depends             Verify dependencies are installed/found.
   --version             show program's version number and exit
-
 ```
 
 
@@ -74,61 +62,75 @@ As mentioned previously, the logic to actually use those results and make a type
 included on the database side.
 
 *staphopia-sccmec* allows you to type using your existing Staphopia results. You just need to provide 
-the `primers.json` and `subtypes.json` outputs from Staphopia and the `--staphopia` parameter. These 
-files are located in the `analyses/sccmec` folder.
+the path to a set of samples processed by staphopia and use the `--staphopia` parameter.
 
 
 Below is an example of typing the Staphopia results for SRX085180.
 ```
-./staphopia-sccmec.py  SRX085180/analyses/sccmec/primers.json SRX085180/analyses/sccmec/subtypes.json ./ --staphopia --prefix SRX085180
-2020-02-21 23:53:33:root:INFO - Processing Staphopia outputs
-2020-02-21 23:53:33:root:INFO - Writing predicted SCCmec type based on primers to .//SRX085180/sccmec-primer-type.json
-{
-    "cassette": {
-        "sample": "SRX085180",
-        "I": false,
-        "II": false,
-        "III": false,
-        "IV": true,
-        "V": false,
-        "VI": false,
-        "VII": false,
-        "VIII": false,
-        "IX": false,
-        "meca": true
-    },
-    "subtype": {
-        "sample": "SRX085180",
-        "Ia": false,
-        "IIa": false,
-        "IIb": false,
-        "IIIa": false,
-        "IVa": false,
-        "IVb": false,
-        "IVc": false,
-        "IVd": true,
-        "IVg": false,
-        "IVh": false
-    }
-}
+./staphopia-sccmec.py /data/storage/semaphore/staphopia-v1/staphopia/ --staphopia | head
+sample  I       II      III     IV      V       VI      VII     VIII    IX      meca    Ia      IIa     IIb     IIIa    IVa     IVb     IVc     IVd     IVg     IVh
+S.200218.00785  False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
+S.200218.00787  False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
+S.200218.00789  False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
+S.200218.00791  False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
+S.200218.00793  False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
+S.200218.00795  False   True    False   True    False   False   False   False   False   True    False   True    False   False   False   False   False   False   False   False
+S.200218.00797  False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
+S.200218.00824  False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
+S.200218.00827  False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
 ```
-
-Based on the results it appears that SRX085180 is SCCmec Type IVd.
 
 ### Typing an Assembly
-As an alternative to Staphopia results, you can provide an assembly. When an assembly is 
-provided, a BLAST database is create of the assembly and the primers are blasted against
-it.
+As an alternative to Staphopia results, you can provide an assembly, or a directory of assemblies. 
+When an assembly is provided, a BLAST database is created of the assembly and the primers are blasted
+against it.
 
-Below is an example of typing the SRX085180 based on its assembly.
+Below is an example of typing the GCF_001580515 assembly, available in the `test/` directory.
+#### Single Assembly
 ```
-./staphopia-sccmec.py  /data/storage/servers/merlin-home/rpetit/cgc-staphopia/staphopia/SRX085/SRX085180/SRX085180/analyses/assembly/SRX085180.contigs.fasta.gz data/ ./
-2020-02-21 23:57:49:root:INFO - Make BLAST database for /data/storage/servers/merlin-home/rpetit/cgc-staphopia/staphopia/SRX085/SRX085180/SRX085180/analyses/assembly/SRX085180.contigs.fasta.gz
-2020-02-21 23:57:49:root:INFO - BLAST SCCmec primers against /data/storage/servers/merlin-home/rpetit/cgc-staphopia/staphopia/SRX085/SRX085180/SRX085180/analyses/assembly/SRX085180.contigs.fasta.gz
-2020-02-21 23:57:50:root:INFO - Writing predicted SCCmec type based on primers to .//SRX085180.contigs.fasta/sccmec-primer-type.json
-{
-    "cassette": {
-        "sample": "SRX085180.contigs.fasta",
+./staphopia-sccmec.py test/GCF_001580515.1.fna --sccmec data/
+sample  I       II      III     IV      V       VI      VII     VIII    IX      meca    Ia      IIa     IIb     IIIa    IVa     IVb     IVc     IVd     IVg     IVh
+GCF_001580515        False   False   False   True    False   False   False   False   False   True    False   False   False   False   True    False   False   False   False   False
+```
+
+#### Directory of Assemblies
+```
+ls ~/bactopia-dev/test-assemblies/
+ERX140798.fna   ERX1711341.fna  ERX204841.fna   ERX3565118.fna  ERX385151.fna   ERX514151.fna  ERX956727.fna   SRX1885573.fna  SRX477083.fna   SRX6900463.fna
+ERX1666543.fna  ERX1830501.fna  ERX2543896.fna  ERX3837876.fna  ERX3969884.fna  ERX770670.fna  SRX1885362.fna  SRX3883084.fna  SRX5659541.fna  SRX7775692.fna
+
+./staphopia-sccmec.py ~/bactopia-dev/test-assemblies/ --sccmec data/
+sample  I       II      III     IV      V       VI      VII     VIII    IX      meca    Ia      IIa     IIb     IIIa    IVa     IVb     IVc     IVd     IVg     IVh
+ERX204841       False   False   False   True    False   False   False   False   False   True    False   False   False   False   True    False   False   False   False   False
+ERX2543896      False   False   False   False   False   False   False   False   False   True    False   False   False   False   False   False   False   False   False   False
+ERX3565118      False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
+SRX3883084      False   False   True    False   True    False   True    False   False   True    False   False   False   True    False   False   False   False   False   False
+SRX6900463      False   False   False   True    False   False   False   False   False   True    False   False   False   False   True    False   False   False   False   False
+ERX956727       False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
+SRX1885362      False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
+SRX7775692      False   False   False   True    False   False   False   False   False   True    False   False   False   False   True    False   False   False   False   False
+ERX514151       False   False   False   True    False   False   False   False   False   True    False   False   False   False   False   False   False   False   False   True
+SRX477083       False   False   False   True    False   False   False   False   False   True    False   False   False   False   True    False   False   False   False   False
+SRX5659541      False   True    False   False   False   False   False   False   False   True    False   True    False   False   False   False   False   False   False   False
+ERX3969884      False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
+ERX1830501      False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
+ERX1711341      False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
+ERX1666543      False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
+ERX385151       False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
+ERX3837876      False   False   False   True    False   False   False   False   False   True    False   False   False   False   False   False   True    False   False   False
+ERX140798       False   False   True    False   False   False   False   False   False   True    False   False   False   True    False   False   False   False   False   False
+SRX1885573      False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
+ERX770670       False   False   False   True    False   False   False   False   False   True    False   False   False   False   False   False   False   False   False   True
+```
+
+### Alternate Outputs
+#### JSON Output
+You can also switch from a tab-delimited output to JSON, using the `--json` option.
+```
+./staphopia-sccmec.py test/GCF_001580515.fna --sccmec data/ --json
+[
+    {
+        "sample": "GCF_001580515",
         "I": false,
         "II": false,
         "III": false,
@@ -138,24 +140,51 @@ Below is an example of typing the SRX085180 based on its assembly.
         "VII": false,
         "VIII": false,
         "IX": false,
-        "meca": true
-    },
-    "subtype": {
-        "sample": "SRX085180.contigs.fasta",
+        "meca": true,
         "Ia": false,
         "IIa": false,
         "IIb": false,
         "IIIa": false,
-        "IVa": false,
+        "IVa": true,
         "IVb": false,
         "IVc": false,
-        "IVd": true,
+        "IVd": false,
         "IVg": false,
         "IVh": false
     }
-}
+]
 ```
 
-Similar to the Staphopia results, SRX085180 based on its assembly appears to be 
-SCCmec Type IVd.
+#### Hamming Distance
+By default, `staphopia-sccmec` reports `True` for exact primer matches and `False` for at least 1 base pair difference. As an alternative you can print the [Hamming Distance](https://en.wikipedia.org/wiki/Hamming_distance) instead. The Hamming Distance outputs the number of mismatches, with 0 being a perfect match.
+
+```
+./staphopia-sccmec.py test/GCF_001580515.fna --sccmec data/ --hamming --json
+[
+    {
+        "sample": "GCF_001580515",
+        "I": 8,
+        "II": 6,
+        "III": 14,
+        "IV": 0,
+        "V": 16,
+        "VI": 14,
+        "VII": 16,
+        "VIII": 20,
+        "IX": 8,
+        "meca": 0,
+        "Ia": 19,
+        "IIa": 20,
+        "IIb": 14,
+        "IIIa": 14,
+        "IVa": 0,
+        "IVb": 14,
+        "IVc": 12,
+        "IVd": 17,
+        "IVg": 12,
+        "IVh": 14
+    }
+]
+```
+
 
