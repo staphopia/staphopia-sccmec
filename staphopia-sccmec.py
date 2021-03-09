@@ -422,8 +422,8 @@ if __name__ == '__main__':
                         help=('Input is a directory of samples processed by Staphopia.'))
     group1.add_argument('--hamming', action='store_true',
                         help='Report the hamming distance of each type.')
-    group1.add_argument('--tab', action='store_true',
-                        help='Report the output as tab-delimited.')
+    group1.add_argument('--json', action='store_true',
+                        help='Report the output as JSON (Default: tab-delimited)')
     group1.add_argument('--debug', action='store_true',
                         help='Print debug related text.')
     group1.add_argument('--depends', action='store_true',
@@ -457,12 +457,11 @@ if __name__ == '__main__':
     subtype_hits = None
     results = []
     if not args.staphopia:
-        assemblies = glob.glob(f'{args.assembly}/*.{args.etx}') if os.path.isdir(args.assembly) else [args.assembly]
-        blastdir = f'{outdir}/.sccmec_blast'
+        assemblies = glob.glob(f'{args.assembly}/*.{args.ext}') if os.path.isdir(args.assembly) else [args.assembly]
         with tempfile.TemporaryDirectory() as tempdir:
             for assembly in assemblies:
                 # Make temporary BLAST database
-                prefix = os.path.basename(assembly).replace(f'{args.ext}', '')
+                prefix = os.path.basename(assembly).replace(f'.{args.ext}', '')
                 outdir = f'{tempdir}/{prefix}'
                 execute(f'mkdir -p {outdir}')
 
@@ -495,9 +494,9 @@ if __name__ == '__main__':
             else:
                 logging.debug(f'Sample {sample} is missing {primer_json} or {subtype_json}, skipping')
 
-    if args.tab:
+    if args.json:
+        print(json.dumps(results, indent=4))
+    else:
         writer = csv.DictWriter(sys.stdout, fieldnames=results[0].keys(), delimiter="\t")
         writer.writeheader()
         writer.writerows(results)
-    else:
-        print(json.dumps(results, indent=4))
