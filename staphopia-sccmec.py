@@ -458,25 +458,28 @@ if __name__ == '__main__':
     results = []
     if not args.staphopia:
         assemblies = glob.glob(f'{args.assembly}/*.{args.ext}') if os.path.isdir(args.assembly) else [args.assembly]
-        with tempfile.TemporaryDirectory() as tempdir:
-            for assembly in assemblies:
-                # Make temporary BLAST database
-                prefix = os.path.basename(assembly).replace(f'.{args.ext}', '')
-                outdir = f'{tempdir}/{prefix}'
-                execute(f'mkdir -p {outdir}')
+        if assemblies:
+            with tempfile.TemporaryDirectory() as tempdir:
+                for assembly in assemblies:
+                    # Make temporary BLAST database
+                    prefix = os.path.basename(assembly).replace(f'.{args.ext}', '')
+                    outdir = f'{tempdir}/{prefix}'
+                    execute(f'mkdir -p {outdir}')
 
-                logging.info(f'Make BLAST database for {assembly}')
-                blastdb = makeblastdb(assembly, outdir, prefix)
+                    logging.info(f'Make BLAST database for {assembly}')
+                    blastdb = makeblastdb(assembly, outdir, prefix)
 
-                # BLAST SCCmec Primers (including subtypes)
-                logging.info(f'BLAST SCCmec primers against {assembly}')
-                primer_hits = blastn(primer_fasta, blastdb, f'{outdir}/primers.json')
-                subtype_hits = blastn(subtype_fasta, blastdb, f'{outdir}/subtypes.json')
+                    # BLAST SCCmec Primers (including subtypes)
+                    logging.info(f'BLAST SCCmec primers against {assembly}')
+                    primer_hits = blastn(primer_fasta, blastdb, f'{outdir}/primers.json')
+                    subtype_hits = blastn(subtype_fasta, blastdb, f'{outdir}/subtypes.json')
 
-                # Merge results and add to list
-                primer_prediction = predict_type_by_primers(prefix, primer_hits, hamming_distance=args.hamming)
-                subtype_prediction = predict_subtype_by_primers(prefix, subtype_hits, hamming_distance=args.hamming)
-                results.append(merge_predictions(primer_prediction, subtype_prediction))
+                    # Merge results and add to list
+                    primer_prediction = predict_type_by_primers(prefix, primer_hits, hamming_distance=args.hamming)
+                    subtype_prediction = predict_subtype_by_primers(prefix, subtype_hits, hamming_distance=args.hamming)
+                    results.append(merge_predictions(primer_prediction, subtype_prediction))
+        else:
+            logging.debug(f'No assemblies were found in {args.assembly} (extension used *.{args.ext})')
     else:
         # Read Staphopia (v1) outputs
         logging.info(f'Processing Staphopia outputs')
@@ -494,9 +497,12 @@ if __name__ == '__main__':
             else:
                 logging.debug(f'Sample {sample} is missing {primer_json} or {subtype_json}, skipping')
 
-    if args.json:
-        print(json.dumps(results, indent=4))
+    if results:
+        if args.json:
+            print(json.dumps(results, indent=4))
+        else:
+            writer = csv.DictWriter(sys.stdout, fieldnames=results[0].keys(), delimiter="\t")
+            writer.writeheader()
+            writer.writerows(results)
     else:
-        writer = csv.DictWriter(sys.stdout, fieldnames=results[0].keys(), delimiter="\t")
-        writer.writeheader()
-        writer.writerows(results)
+        print("Nothing was processed, if this is unexpected please verify paths and try using --debug")
