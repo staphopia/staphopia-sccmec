@@ -187,4 +187,14 @@ By default, `staphopia-sccmec` reports `True` for exact primer matches and `Fals
 ]
 ```
 
+# License
+[MIT License](https://raw.githubusercontent.com/staphopia/staphopia-sccmec/master/LICENSE)
+
+# Citation
+Petit III RA, Read TD, *Staphylococcus aureus viewed from the perspective of 40,000+ genomes.* PeerJ 6, e5261 (2018), http://dx.doi.org/10.7717/peerj.5261.
+
+# Author 
+
+* Robert A. Petit III
+* Twitter: [@rpetit3](https://twitter.com/rpetit3)
 
