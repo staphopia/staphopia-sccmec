@@ -10,7 +10,7 @@ from collections import OrderedDict
 
 
 PROGRAM = os.path.basename(sys.argv[0])
-VERSION = "0.0.3"
+VERSION = "1.0.0"
 DESCRIPTION = "A standalone version of Staphopia's SCCmec typing method."
 STDOUT = 11
 STDERR = 12
