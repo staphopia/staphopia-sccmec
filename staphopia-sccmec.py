@@ -1,6 +1,30 @@
 #! /usr/bin/env python3
 """
+usage: staphopia-sccmec.py [-h] [--sccmec SCCMEC_DATA] [--ext STR]
+                           [--staphopia] [--hamming] [--tab] [--debug]
+                           [--depends] [--version]
+                           ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR
 
+Determine SCCmec Type/SubType
+
+optional arguments:
+  -h, --help            show this help message and exit
+
+Options:
+
+  ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR
+                        Input assembly (FASTA format), directory of assemblies
+                        to predict SCCmec. Or, a directory of samples
+                        processed by Staphopia (requires "--staphopia"
+  --sccmec SCCMEC_DATA  Directory where SCCmec reference data is stored.
+  --ext STR             Extension used by assemblies. (Default: fna)
+  --staphopia           Input is a directory of samples processed by
+                        Staphopia.
+  --hamming             Report the hamming distance of each type.
+  --json                Report the output as JSON (Default: tab-delimited)
+  --debug               Print debug related text.
+  --depends             Verify dependencies are installed/found.
+  --version             show program's version number and exit
 """
 import json
 import logging
