@@ -1,9 +1,9 @@
 #! /usr/bin/env python3
 """
-usage: staphopia-sccmec.py [-h] [--sccmec SCCMEC_DATA] [--ext STR]
-                           [--staphopia] [--hamming] [--tab] [--debug]
-                           [--depends] [--version]
-                           ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR
+usage: staphopia-sccmec [-h] [--sccmec SCCMEC_DATA] [--ext STR] [--staphopia]
+                        [--hamming] [--json] [--debug] [--depends]
+                        [--citation] [--version]
+                        ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR
 
 Determine SCCmec Type/SubType
 
@@ -16,7 +16,7 @@ Options:
                         Input assembly (FASTA format), directory of assemblies
                         to predict SCCmec. Or, a directory of samples
                         processed by Staphopia (requires "--staphopia"
-  --sccmec SCCMEC_DATA  Directory where SCCmec reference data is stored.
+  --sccmec SCCMEC_DATA  Directory where SCCmec reference data is stored
   --ext STR             Extension used by assemblies. (Default: fna)
   --staphopia           Input is a directory of samples processed by
                         Staphopia.
@@ -24,6 +24,7 @@ Options:
   --json                Report the output as JSON (Default: tab-delimited)
   --debug               Print debug related text.
   --depends             Verify dependencies are installed/found.
+  --citation            Print citation information for using Staphopia SCCmec
   --version             show program's version number and exit
 """
 import json
@@ -34,6 +35,7 @@ from collections import OrderedDict
 
 
 PROGRAM = os.path.basename(sys.argv[0])
+PROGRAM_DIR = os.path.abspath(os.path.dirname(__file__)).replace('/bin', '')
 VERSION = "1.0.0"
 DESCRIPTION = "A standalone version of Staphopia's SCCmec typing method."
 STDOUT = 11
@@ -427,39 +429,38 @@ if __name__ == '__main__':
         formatter_class=ap.RawDescriptionHelpFormatter,
         epilog=textwrap.dedent(f'''
             example usage:
-              {PROGRAM} ST2019.fasta sccmec_dir --prefix sample-2019
-              {PROGRAM} test/GCF_001580515.1.fna data/ ./
+              {PROGRAM} share/staphopia-sccmec/test/GCF_001580515.1.fna
         ''')
     )
-    parser = ap.ArgumentParser(prog='staphopia-sccmec.py',
+    DATA_DIR = f'{PROGRAM_DIR}/share/staphopia-sccmec/data'
+    parser = ap.ArgumentParser(prog='staphopia-sccmec',
                                conflict_handler='resolve',
                                description='Determine SCCmec Type/SubType')
     group1 = parser.add_argument_group('Options', '')
     group1.add_argument('assembly', metavar="ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR", type=str,
                         help=('Input assembly (FASTA format), directory of assemblies to predict SCCmec. Or, a '
                               'directory of samples processed by Staphopia (requires "--staphopia"'))
-    group1.add_argument('--sccmec', metavar="SCCMEC_DATA", type=str, default="./",
-                        help='Directory where SCCmec reference data is stored.')
-    group1.add_argument('--ext', metavar="STR", type=str, default="fna",
+    group1.add_argument('--sccmec', metavar="SCCMEC_DATA", type=str, default=DATA_DIR,
+                        help=f'Directory where SCCmec reference data is stored (Default: {DATA_DIR}).')
+    group1.add_argument('--ext', metavar="STR", type=str, default="fna", 
                         help=('Extension used by assemblies. (Default: fna)'))
-    group1.add_argument('--staphopia', action='store_true', 
-                        help=('Input is a directory of samples processed by Staphopia.'))
-    group1.add_argument('--hamming', action='store_true',
-                        help='Report the hamming distance of each type.')
-    group1.add_argument('--json', action='store_true',
-                        help='Report the output as JSON (Default: tab-delimited)')
-    group1.add_argument('--debug', action='store_true',
-                        help='Print debug related text.')
-    group1.add_argument('--depends', action='store_true',
-                        help='Verify dependencies are installed/found.')
-    group1.add_argument('--version', action='version',
-                        version=f'{PROGRAM} {VERSION}')
+    group1.add_argument('--staphopia', action='store_true',
+                        help='Input is a directory of samples processed by Staphopia.')
+    group1.add_argument('--hamming', action='store_true', help='Report the hamming distance of each type.')
+    group1.add_argument('--json', action='store_true', help='Report the output as JSON (Default: tab-delimited)')
+    group1.add_argument('--debug', action='store_true', help='Print debug related text.')
+    group1.add_argument('--depends', action='store_true', help='Verify dependencies are installed/found.')
+    group1.add_argument('--citation', action='store_true', help='Print citation information for using Staphopia SCCmec')
+    group1.add_argument('--version', action='version', version=f'{PROGRAM} {VERSION}')
 
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(0)
 
     args = parser.parse_args()
+
+
+
 
     # Setup logging
     logging.basicConfig(format='%(asctime)s:%(name)s:%(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
@@ -468,7 +469,10 @@ if __name__ == '__main__':
     # Check dependencies
     primer_fasta = f'{args.sccmec}/primers.fasta'
     subtype_fasta = f'{args.sccmec}/subtypes.fasta'
-    if args.depends:
+    if args.citation:
+        print("Petit III RA, Read TD, Staphylococcus aureus viewed from the perspective of 40,000+ genomes. PeerJ 6, e5261 (2018).")
+        sys.exit(0)
+    elif args.depends:
         validate_requirements()
         validate_datasets(args.sccmec, args.assembly)
         sys.exit(0)
