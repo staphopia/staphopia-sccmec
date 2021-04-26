@@ -21,8 +21,8 @@ conda create -n staphopia-sccmec -c conda-forge -c bioconda staphopia-sccmec
 ### From Source
 ```
 git clone git@github.com:staphopia/staphopia-sccmec.git
-cd staphopia-sccmec.git
-./staphopia-sccmec.py
+cd staphopia-sccmec
+./bin/staphopia-sccmec.py
 ```
 
 ### Usage
