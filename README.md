@@ -14,7 +14,9 @@ and a path to SCCmec data ([included in this repo](https://github.com/staphopia/
 
 # Installation
 ### Bioconda
-*staphopia-sccmec* is currently not available from Bioconda, but it is being worked on.
+```
+conda create -n staphopia-sccmec -c conda-forge -c bioconda staphopia-sccmec
+```
 
 ### From Source
 ```
@@ -25,10 +27,10 @@ cd staphopia-sccmec.git
 
 ### Usage
 ```
-usage: staphopia-sccmec.py [-h] [--sccmec SCCMEC_DATA] [--ext STR]
-                           [--staphopia] [--hamming] [--tab] [--debug]
-                           [--depends] [--version]
-                           ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR
+usage: staphopia-sccmec [-h] [--assembly ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR]
+                        [--staphopia STAPHOPIA_DIR] [--sccmec SCCMEC_DATA]
+                        [--ext STR] [--hamming] [--json] [--debug] [--depends]
+                        [--test] [--citation] [--version]
 
 Determine SCCmec Type/SubType
 
@@ -36,19 +38,22 @@ optional arguments:
   -h, --help            show this help message and exit
 
 Options:
-
-  ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR
+  --assembly ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR
                         Input assembly (FASTA format), directory of assemblies
-                        to predict SCCmec. Or, a directory of samples
-                        processed by Staphopia (requires "--staphopia"
-  --sccmec SCCMEC_DATA  Directory where SCCmec reference data is stored.
+                        to predict SCCmec. (Cannot be used with --staphopia)
+  --staphopia STAPHOPIA_DIR
+                        Input directory of samples processed by Staphopia.
+                        (Cannot be used with --assembly)
+  --sccmec SCCMEC_DATA  Directory where SCCmec reference data is stored
+                        (Default: /local/home/rpetit/repos/staphopia-
+                        sccmec/share/staphopia-sccmec/data).
   --ext STR             Extension used by assemblies. (Default: fna)
-  --staphopia           Input is a directory of samples processed by
-                        Staphopia.
   --hamming             Report the hamming distance of each type.
   --json                Report the output as JSON (Default: tab-delimited)
   --debug               Print debug related text.
   --depends             Verify dependencies are installed/found.
+  --test                Run with example test data.
+  --citation            Print citation information for using Staphopia SCCmec
   --version             show program's version number and exit
 ```
 
@@ -67,7 +72,7 @@ the path to a set of samples processed by staphopia and use the `--staphopia` pa
 
 Below is an example of typing the Staphopia results for SRX085180.
 ```
-./staphopia-sccmec.py /data/storage/semaphore/staphopia-v1/staphopia/ --staphopia | head
+staphopia-sccmec --staphopia /data/storage/semaphore/staphopia-v1/staphopia/ | head
 sample  I       II      III     IV      V       VI      VII     VIII    IX      meca    Ia      IIa     IIb     IIIa    IVa     IVb     IVc     IVd     IVg     IVh
 S.200218.00785  False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
 S.200218.00787  False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False   False
@@ -88,7 +93,7 @@ against it.
 Below is an example of typing the GCF_001580515 assembly, available in the `test/` directory.
 #### Single Assembly
 ```
-./staphopia-sccmec.py test/GCF_001580515.1.fna --sccmec data/
+staphopia-sccmec --assembly test/GCF_001580515.1.fna
 sample  I       II      III     IV      V       VI      VII     VIII    IX      meca    Ia      IIa     IIb     IIIa    IVa     IVb     IVc     IVd     IVg     IVh
 GCF_001580515        False   False   False   True    False   False   False   False   False   True    False   False   False   False   True    False   False   False   False   False
 ```
@@ -99,7 +104,7 @@ ls ~/bactopia-dev/test-assemblies/
 ERX140798.fna   ERX1711341.fna  ERX204841.fna   ERX3565118.fna  ERX385151.fna   ERX514151.fna  ERX956727.fna   SRX1885573.fna  SRX477083.fna   SRX6900463.fna
 ERX1666543.fna  ERX1830501.fna  ERX2543896.fna  ERX3837876.fna  ERX3969884.fna  ERX770670.fna  SRX1885362.fna  SRX3883084.fna  SRX5659541.fna  SRX7775692.fna
 
-./staphopia-sccmec.py ~/bactopia-dev/test-assemblies/ --sccmec data/
+staphopia-sccmec --assembly ~/bactopia-dev/test-assemblies/
 sample  I       II      III     IV      V       VI      VII     VIII    IX      meca    Ia      IIa     IIb     IIIa    IVa     IVb     IVc     IVd     IVg     IVh
 ERX204841       False   False   False   True    False   False   False   False   False   True    False   False   False   False   True    False   False   False   False   False
 ERX2543896      False   False   False   False   False   False   False   False   False   True    False   False   False   False   False   False   False   False   False   False
@@ -127,7 +132,7 @@ ERX770670       False   False   False   True    False   False   False   False   
 #### JSON Output
 You can also switch from a tab-delimited output to JSON, using the `--json` option.
 ```
-./staphopia-sccmec.py test/GCF_001580515.fna --sccmec data/ --json
+staphopia-sccmec --assembly test/GCF_001580515.fna --json
 [
     {
         "sample": "GCF_001580515",
@@ -159,7 +164,7 @@ You can also switch from a tab-delimited output to JSON, using the `--json` opti
 By default, `staphopia-sccmec` reports `True` for exact primer matches and `False` for at least 1 base pair difference. As an alternative you can print the [Hamming Distance](https://en.wikipedia.org/wiki/Hamming_distance) instead. The Hamming Distance outputs the number of mismatches, with 0 being a perfect match.
 
 ```
-./staphopia-sccmec.py test/GCF_001580515.fna --sccmec data/ --hamming --json
+staphopia-sccmec --assembly test/GCF_001580515.fna --hamming --json
 [
     {
         "sample": "GCF_001580515",
