@@ -1,9 +1,9 @@
 #! /usr/bin/env python3
 """
-usage: staphopia-sccmec [-h] [--sccmec SCCMEC_DATA] [--ext STR] [--staphopia]
-                        [--hamming] [--json] [--debug] [--depends]
-                        [--citation] [--version]
-                        ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR
+usage: staphopia-sccmec [-h] [--assembly ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR]
+                        [--staphopia STAPHOPIA_DIR] [--sccmec SCCMEC_DATA]
+                        [--ext STR] [--hamming] [--json] [--debug] [--depends]
+                        [--test] [--citation] [--version]
 
 Determine SCCmec Type/SubType
 
@@ -11,19 +11,21 @@ optional arguments:
   -h, --help            show this help message and exit
 
 Options:
-
-  ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR
+  --assembly ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR
                         Input assembly (FASTA format), directory of assemblies
-                        to predict SCCmec. Or, a directory of samples
-                        processed by Staphopia (requires "--staphopia"
+                        to predict SCCmec. (Cannot be used with --staphopia)
+  --staphopia STAPHOPIA_DIR
+                        Input directory of samples processed by Staphopia.
+                        (Cannot be used with --assembly)
   --sccmec SCCMEC_DATA  Directory where SCCmec reference data is stored
+                        (Default: /local/home/rpetit/repos/staphopia-
+                        sccmec/share/staphopia-sccmec/data).
   --ext STR             Extension used by assemblies. (Default: fna)
-  --staphopia           Input is a directory of samples processed by
-                        Staphopia.
   --hamming             Report the hamming distance of each type.
   --json                Report the output as JSON (Default: tab-delimited)
   --debug               Print debug related text.
   --depends             Verify dependencies are installed/found.
+  --test                Run with example test data.
   --citation            Print citation information for using Staphopia SCCmec
   --version             show program's version number and exit
 """
