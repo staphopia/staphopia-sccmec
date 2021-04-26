@@ -9,7 +9,7 @@ but the logic making the type and subtype calls was in the [Staphopia Website](h
 *staphopia-sccmec* has taken this process and merged into a single command. 
 
 You can either provide results already produced by Staphopia or give an assembly
-and a path to SCCmec data ([included in this repo](https://github.com/staphopia/staphopia-sccmec/tree/master/data)).
+and a path to SCCmec data ([included in this repo](https://github.com/staphopia/staphopia-sccmec/tree/master/share/staphopia-sccmec/data)).
 
 
 # Installation
