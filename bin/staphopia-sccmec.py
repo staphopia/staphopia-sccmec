@@ -51,7 +51,7 @@ def validate_requirements():
     missing = False
     for prog, path in programs.items():
         if path:
-            logging.debug(f'{prog}: command found!')
+            logging.info(f'{prog}: command found!')
         else:
             logging.error(f'{prog}: command not found in PATH.')
             missing = True
@@ -61,13 +61,13 @@ def validate_requirements():
         sys.exit(1)
 
 
-def validate_datasets(data_dir, input_assembly):
+def validate_datasets(data_dir):
     """Validate required reference datasets are available, if not exit (1)."""
-    datasets = {'primers': f'{data_dir}/primers.fasta', 'subtypes': f'{data_dir}/subtypes.fasta', 'inputs': input_assembly}
+    datasets = {'primers': f'{data_dir}/primers.fasta', 'subtypes': f'{data_dir}/subtypes.fasta'}
     missing = False
     for dataset, path in datasets.items():
         if os.path.exists(path):
-            logging.debug(f'{dataset} ({path}) found!')
+            logging.info(f'{dataset} ({path}) found!')
         else:
             logging.error(f'{dataset} ({path}) not found, please verify path.')
             missing = True
@@ -429,27 +429,29 @@ if __name__ == '__main__':
         formatter_class=ap.RawDescriptionHelpFormatter,
         epilog=textwrap.dedent(f'''
             example usage:
-              {PROGRAM} share/staphopia-sccmec/test/GCF_001580515.1.fna
+              {PROGRAM} --assembly my-assembly.fna
+              {PROGRAM} --staphopia /path/to/staphopia
         ''')
     )
     DATA_DIR = f'{PROGRAM_DIR}/share/staphopia-sccmec/data'
+    TEST_DIR = f'{PROGRAM_DIR}/share/staphopia-sccmec/test'
     parser = ap.ArgumentParser(prog='staphopia-sccmec',
                                conflict_handler='resolve',
                                description='Determine SCCmec Type/SubType')
     group1 = parser.add_argument_group('Options', '')
-    group1.add_argument('assembly', metavar="ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR", type=str,
-                        help=('Input assembly (FASTA format), directory of assemblies to predict SCCmec. Or, a '
-                              'directory of samples processed by Staphopia (requires "--staphopia"'))
+    group1.add_argument('--assembly', metavar="ASSEMBLY|ASSEMBLY_DIR|STAPHOPIA_DIR", type=str,
+                        help='Input assembly (FASTA format), directory of assemblies to predict SCCmec. (Cannot be used with --staphopia)')
+    group1.add_argument('--staphopia', metavar="STAPHOPIA_DIR", type=str,
+                        help='Input directory of samples processed by Staphopia. (Cannot be used with --assembly)')
     group1.add_argument('--sccmec', metavar="SCCMEC_DATA", type=str, default=DATA_DIR,
                         help=f'Directory where SCCmec reference data is stored (Default: {DATA_DIR}).')
     group1.add_argument('--ext', metavar="STR", type=str, default="fna", 
                         help=('Extension used by assemblies. (Default: fna)'))
-    group1.add_argument('--staphopia', action='store_true',
-                        help='Input is a directory of samples processed by Staphopia.')
     group1.add_argument('--hamming', action='store_true', help='Report the hamming distance of each type.')
     group1.add_argument('--json', action='store_true', help='Report the output as JSON (Default: tab-delimited)')
     group1.add_argument('--debug', action='store_true', help='Print debug related text.')
     group1.add_argument('--depends', action='store_true', help='Verify dependencies are installed/found.')
+    group1.add_argument('--test', action='store_true', help='Run with example test data.')
     group1.add_argument('--citation', action='store_true', help='Print citation information for using Staphopia SCCmec')
     group1.add_argument('--version', action='version', version=f'{PROGRAM} {VERSION}')
 
@@ -459,12 +461,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-
-
-
     # Setup logging
     logging.basicConfig(format='%(asctime)s:%(name)s:%(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
-                        stream=sys.stderr, level=set_log_level(args.debug))
+                        stream=sys.stderr, level=set_log_level(True if args.depends else args.debug))
 
     # Check dependencies
     primer_fasta = f'{args.sccmec}/primers.fasta'
@@ -474,18 +473,23 @@ if __name__ == '__main__':
         sys.exit(0)
     elif args.depends:
         validate_requirements()
-        validate_datasets(args.sccmec, args.assembly)
+        validate_datasets(args.sccmec)
         sys.exit(0)
     else:
         if not args.staphopia:
             validate_requirements()
-            validate_datasets(args.sccmec, args.assembly)
+            validate_datasets(args.sccmec)
+
+    if args.assembly and args.staphopia:
+        logging.error("--assembly and --staphopia cannot be used together, exiting")
+        sys.exit(1)
 
     primer_hits = None
     subtype_hits = None
     results = []
     if not args.staphopia:
-        assemblies = glob.glob(f'{args.assembly}/*.{args.ext}') if os.path.isdir(args.assembly) else [args.assembly]
+        assembly_path = TEST_DIR if args.test else args.assembly
+        assemblies = glob.glob(f'{assembly_path}/*.{args.ext}') if os.path.isdir(assembly_path) else [assembly_path]
         if assemblies:
             with tempfile.TemporaryDirectory() as tempdir:
                 for assembly in assemblies:
@@ -507,7 +511,7 @@ if __name__ == '__main__':
                     subtype_prediction = predict_subtype_by_primers(prefix, subtype_hits, hamming_distance=args.hamming)
                     results.append(merge_predictions(primer_prediction, subtype_prediction))
         else:
-            logging.debug(f'No assemblies were found in {args.assembly} (extension used *.{args.ext})')
+            logging.debug(f'No assemblies were found in {assembly_path} (extension used *.{args.ext})')
     else:
         # Read Staphopia (v1) outputs
         logging.info(f'Processing Staphopia outputs')
