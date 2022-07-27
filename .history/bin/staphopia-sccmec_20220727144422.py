@@ -507,8 +507,8 @@ if __name__ == '__main__':
 
                     # BLAST SCCmec Primers (including subtypes)
                     logging.info(f'BLAST SCCmec primers against {assembly}')
-                    primer_hits = blastn(primer_fasta, blastdb, f'{outdir}/primers.json', args.evalue)
-                    subtype_hits = blastn(subtype_fasta, blastdb, f'{outdir}/subtypes.json', args.evalue)
+                    primer_hits = blastn(primer_fasta, blastdb, f'{outdir}/primers.json', args.e)
+                    subtype_hits = blastn(subtype_fasta, blastdb, f'{outdir}/subtypes.json')
 
                     # Merge results and add to list
                     primer_prediction = predict_type_by_primers(prefix, primer_hits, hamming_distance=args.hamming)

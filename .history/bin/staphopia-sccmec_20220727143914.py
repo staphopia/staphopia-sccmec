@@ -121,11 +121,11 @@ def makeblastdb(input, outdir, prefix):
     return f'{blastdb}/{prefix}'
 
 
-def blastn(query, blastdb, output, evalue='1e-5'):
+def blastn(query, blastdb, output, evalue):
     """ BLAST SCCmec related primers against an input assembly. """
     execute((
         f'blastn -db {blastdb} -max_target_seqs 1 -dust no -word_size 7 '
-        f'-perc_identity 100 -outfmt 15 -query {query} -evalue {evalue}> {output}'
+        f'-perc_identity 100 -outfmt 15 -query {query} > {output}'
     ))
     return read_blast_json(output)
 
@@ -449,8 +449,8 @@ if __name__ == '__main__':
                         help=f'Directory where SCCmec reference data is stored (Default: {DATA_DIR}).')
     group1.add_argument('--ext', metavar="STR", type=str, default="fna", 
                         help=('Extension used by assemblies. (Default: fna)'))
-    group1.add_argument('--evalue', help='evalue required by blast', default='1e-5')
     group1.add_argument('--hamming', action='store_true', help='Report the hamming distance of each type.')
+    group1.add_argument('--evalue', action='store_true', help='evalue required by blast')
 
     group1.add_argument('--json', action='store_true', help='Report the output as JSON (Default: tab-delimited)')
     group1.add_argument('--debug', action='store_true', help='Print debug related text.')
@@ -507,8 +507,8 @@ if __name__ == '__main__':
 
                     # BLAST SCCmec Primers (including subtypes)
                     logging.info(f'BLAST SCCmec primers against {assembly}')
-                    primer_hits = blastn(primer_fasta, blastdb, f'{outdir}/primers.json', args.evalue)
-                    subtype_hits = blastn(subtype_fasta, blastdb, f'{outdir}/subtypes.json', args.evalue)
+                    primer_hits = blastn(primer_fasta, blastdb, f'{outdir}/primers.json')
+                    subtype_hits = blastn(subtype_fasta, blastdb, f'{outdir}/subtypes.json')
 
                     # Merge results and add to list
                     primer_prediction = predict_type_by_primers(prefix, primer_hits, hamming_distance=args.hamming)
