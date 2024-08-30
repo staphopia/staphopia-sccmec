@@ -1,3 +1,7 @@
+# Archived - Please use https://github.com/rpetit3/sccmec
+
+
+
 *staphopia-sccmec* reads Staphopia results or assembly to assign a SCCmec type.
 
 # staphopia-sccmec
